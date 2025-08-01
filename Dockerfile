@@ -11,7 +11,7 @@ COPY firebase.json ./
 COPY .env ./
 
 # Copiar el PDF del reglamento
-COPY Reglamento_Académico.pdf ./
+COPY functions/Reglamento.pdf ./functions/
 
 # Instalar dependencias principales
 RUN npm install
@@ -27,4 +27,4 @@ COPY public/ ./public/
 EXPOSE 4000 5000 5001 9099
 
 # Comando para ejecutar emuladores
-CMD ["firebase", "emulators:start", "--host", "0.0.0.0"]
+CMD ["firebase", "emulators:start", "--project", "demo-bot"]

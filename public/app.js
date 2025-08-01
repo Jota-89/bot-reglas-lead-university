@@ -17,7 +17,7 @@ const auth = getAuth(app);
 const functions = getFunctions(app);
 
 // Conectar a emuladores locales
-if (location.hostname === '127.0.0.1' || location.hostname === 'localhost' || location.hostname === 'bot-reglas-lead.onrender.com') {
+if (location.hostname === '127.0.0.1' || location.hostname === 'localhost') {
   connectFunctionsEmulator(functions, location.hostname, 5001);
 }
 
