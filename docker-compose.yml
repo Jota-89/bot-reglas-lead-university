@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  bot-reglas:
+    build: .
+    ports:
+      - "4000:4000"   # Emulator UI
+      - "5000:5000"   # Hosting (tu app web)
+      - "5001:5001"   # Functions
+      - "9099:9099"   # Auth
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/functions/node_modules
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+    stdin_open: true
+    tty: true

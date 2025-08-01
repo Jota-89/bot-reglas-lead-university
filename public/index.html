@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bot de Reglas Académicas - Lead University</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <i class="fas fa-university"></i>
+                <h1>Bot de Reglas Académicas</h1>
+                <span class="university">Lead University</span>
+            </div>
+        </header>
+        <div class="chat-container">
+            <div class="welcome-message">
+                <h2>¡Hola! Soy tu asistente de reglas académicas</h2>
+                <p>Pregúntame sobre matrícula, becas, repeticiones y cualquier duda del reglamento</p>
+            </div>
+            <div class="chat-messages" id="chatMessages"></div>
+            <div class="chat-input">
+                <input type="text" id="messageInput" placeholder="Pregunta sobre el reglamento académico...">
+                <button id="sendBtn"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="app.js"></script>
+</body>
+</html>
