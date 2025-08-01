@@ -27,4 +27,4 @@ COPY public/ ./public/
 EXPOSE 4000 5000 5001 9099
 
 # Comando para ejecutar emuladores
-CMD ["firebase", "emulators:start", "--project", "demo-bot"]
+CMD ["sh", "-c", "firebase emulators:start --project demo-bot & sleep infinity"]
