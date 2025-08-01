@@ -4,6 +4,7 @@ const admin = require("firebase-admin");
 const fs = require('fs');
 const path = require('path');
 const pdfParse = require('pdf-parse');
+const cors = require('cors')({origin: true});
 
 admin.initializeApp();
 
@@ -51,8 +52,8 @@ async function loadReglamento() {
 }
 
 // Función principal para consultar el reglamento
-exports.consultarReglamento = onCall(async (request) => {
-  try {
+exports.consultarReglamento = onCall({cors: true}, async (request) => {
+    try {
     console.log('=== NUEVA CONSULTA ===');
     const {pregunta} = request.data;
     console.log('Pregunta recibida:', pregunta);
@@ -112,8 +113,8 @@ RESPUESTA:
 });
 
 // Función auxiliar para obtener información específica
-exports.getBecasInfo = onCall(async (request) => {
-  try {
+exports.getBecasInfo = onCall({cors: true}, async (request) => {
+    try {
     console.log('=== CONSULTA DE BECAS ===');
     const reglamento = await loadReglamento();
     
