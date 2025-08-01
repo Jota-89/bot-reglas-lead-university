@@ -6,8 +6,8 @@ import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://w
 const firebaseConfig = {
   apiKey: "demo-project",
   authDomain: "demo-project.firebaseapp.com",
-  projectId: "bot-reglas-lead-2025",
-  storageBucket: "bot-reglas-lead-2025.appspot.com",
+  projectId: "demo-bot",
+  storageBucket: "demo-bot.appspot.com",
   messagingSenderId: "123456789",
   appId: "demo-app-id"
 };
