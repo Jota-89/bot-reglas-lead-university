@@ -1,6 +1,5 @@
 // Configuración Firebase
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js';
 
 const firebaseConfig = {
@@ -13,7 +12,6 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
 const functions = getFunctions(app);
 
 // Conectar a emuladores locales
@@ -40,8 +38,6 @@ messageInput.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') sendMessage();
 });
 
-// Autenticación anónima al cargar
-signInAnonymously(auth);
 
 async function sendMessage() {
   const message = messageInput.value.trim();
