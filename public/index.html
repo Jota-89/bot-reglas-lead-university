@@ -1,33 +1,45 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bot de Reglas Académicas - Lead University</title>
-    <link rel="stylesheet" href="style.css">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#003865" />
+  <title>Asistente Académico · Lead University</title>
+
+  <!-- Tipografía profesional -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=lead-clean-2" />
 </head>
 <body>
-    <div class="container">
-        <header class="header">
-            <div class="logo">
-                <i class="fas fa-university"></i>
-                <h1>Bot de Reglas Académicas</h1>
-                <span class="university">Lead University</span>
-            </div>
-        </header>
-        <div class="chat-container">
-            <div class="welcome-message">
-                <h2>¡Hola! Soy tu asistente de reglas académicas</h2>
-                <p>Pregúntame sobre matrícula, becas, repeticiones y cualquier duda del reglamento</p>
-            </div>
-            <div class="chat-messages" id="chatMessages"></div>
-            <div class="chat-input">
-                <input type="text" id="messageInput" placeholder="Pregunta sobre el reglamento académico...">
-                <button id="sendBtn"><i class="fas fa-paper-plane"></i></button>
-            </div>
+  <!-- Fondo -->
+  <div class="bg" aria-hidden="true"></div>
+
+  <main class="wrap" role="main" aria-label="Asistente de Reglamento Académico">
+    <section class="card" id="chat">
+      <!-- Header claro y legible -->
+      <header class="card__header">
+        <div class="brand">
+          <img class="brand__logo" src="assets/leadlogo.png" alt="Lead University" decoding="async" />
+          <div class="brand__text">
+            <h1 class="brand__title">Asistente Académico</h1>
+            <p class="brand__subtitle">Reglamento Académico · Lead University</p>
+          </div>
         </div>
-    </div>
-    <script type="module" src="app.js"></script>
+      </header>
+
+      <!-- Mensajes -->
+      <section id="chat-output" class="card__messages" aria-live="polite" aria-label="Mensajes del chat"></section>
+
+      <!-- Composer -->
+      <form id="chat-form" class="card__composer" autocomplete="off">
+        <label class="sr-only" for="user-input">Escribe tu pregunta</label>
+        <input id="user-input" type="text" placeholder="Escribe tu pregunta del reglamento…" aria-label="Pregunta" required />
+        <button id="send-btn" type="submit" class="btn">Enviar</button>
+      </form>
+    </section>
+  </main>
+
+  <!-- Tu JS de cliente -->
+  <script src="client.js?v=lead-clean-2"></script>
 </body>
 </html>
