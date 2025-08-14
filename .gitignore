@@ -1,6 +1,15 @@
+﻿# node / firebase
 node_modules/
 functions/node_modules/
-*.log
-.env.local
-.firebase/
 firebase-debug.log
+.firebase/
+
+# build/runtime
+functions/data/
+*.log
+
+# secrets
+.env
+
+# OS
+.DS_Store

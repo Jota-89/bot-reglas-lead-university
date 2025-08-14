@@ -14,7 +14,7 @@ admin.initializeApp();
 const genAI = new GoogleGenerativeAI("AIzaSyCr4iFChsKJmvN92nNHq1xX97XFDy-cuxk");
 
 // Si NO quieres usar datos del sitio (solo Reglamento), déjalo en false
-const ENABLE_WEB_SOURCES = false;
+const ENABLE_WEB_SOURCES = true;
 
 // Fuentes oficiales (solo si ENABLE_WEB_SOURCES = true)
 const FAQ_SOURCES = [
