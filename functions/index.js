@@ -9,39 +9,48 @@ const pdfParse = require("pdf-parse");
 admin.initializeApp();
 
 /** ============================================
- *  CONFIG RÁPIDA
+ *  CONFIG
  *  ============================================ */
 const genAI = new GoogleGenerativeAI("AIzaSyCr4iFChsKJmvN92nNHq1xX97XFDy-cuxk");
 
-// Si NO quieres usar datos del sitio (solo Reglamento), déjalo en false
+// Activa scraping si quieres sumar el sitio. (true/false)
 const ENABLE_WEB_SOURCES = true;
 
-// Fuentes oficiales (solo si ENABLE_WEB_SOURCES = true)
-const FAQ_SOURCES = [
-  { url: "https://ulead.ac.cr/faq/",             label: "FAQ general" },
-  { url: "https://ulead.ac.cr/bachilleratos/",   label: "Bachilleratos · FAQ" },
-  { url: "https://ulead.ac.cr/maestrias/",       label: "Maestrías · FAQ" },
-  { url: "https://ulead.ac.cr/especialidades/",  label: "Especialidades · FAQ" },
-  { url: "https://ulead.ac.cr/admision-y-becas/",label: "Admisión y Becas" }
+const EXTRA_DOCS = [
+  { file: "Practica_Profesional.pdf", label: "Practica Profesional Supervisada (PPS)" },
+  { file: "DEC-010-A Política para las clases virtuales e hibridas.pdf", label: "Politica clases virtuales e hibridas (DEC-010) camara" },
+  { file: "SolicituddePracticaProfesional2023.docx", label: "Solicitud de Practica Profesional (PPS)" },
+  { file: "Politicadeusodecamara.docx", label: "Politica de uso de camara" }   // <-- NUEVO
+];
+
+
+// Boletines / comunicados internos con OVERRIDES (PRIORIDAD sobre otras fuentes)
+const BULLETINS = [
+  {
+    title: "Convocatoria PPS 2025Q3",
+    text: "Periodo abierto para recepcion de solicitudes de Practica Profesional Supervisada. Fecha limite: lunes 01 de septiembre de 2025. Solicitudes posteriores se evaluan caso por caso. La PPS es requisito de graduacion; conlleva la matricula de un curso con sesiones semanales durante el cuatrimestre y el desarrollo del TFG. La PPS no se puede convalidar. Si ya trabaja, debe solicitar igualmente para evaluar aplicabilidad de la posicion. Para PPS en tercer cuatrimestre, el/la estudiante debe estar laborando a mas tardar el lunes 01 de septiembre de 2025; si inicia despues, debe comunicarlo para valorar.",
+    source: "Comunicado oficial (correo)",
+    date: "2025-09-01"
+  }
 ];
 
 /** ============================================
  *  ESTADO / RUTAS
  *  ============================================ */
 let reglamentoText = null;
-let ragIndex = null; // [{id, article, text, embedding, source}]
+let ragIndex = null;
 const DATA_DIR   = path.join(__dirname, "data");
 const INDEX_PATH = path.join(DATA_DIR, "index.json");
 
 /** ============================================
- *  UTILIDADES PDF / CHUNKING
+ *  CARGA DE PDF / DOCX
  *  ============================================ */
 async function loadReglamento() {
   if (reglamentoText) return reglamentoText;
   const pdfPath = path.join(__dirname, "Reglamento.pdf");
   if (!fs.existsSync(pdfPath)) {
     console.error("No existe Reglamento.pdf en:", pdfPath);
-    reglamentoText = "Error: no se encontró el reglamento.";
+    reglamentoText = "Error: no se encontro el reglamento.";
     return reglamentoText;
   }
   const data = await pdfParse(fs.readFileSync(pdfPath));
@@ -49,11 +58,35 @@ async function loadReglamento() {
   return reglamentoText;
 }
 
-// Divide por “Artículo X” (fallback por longitud si no encuentra títulos)
+async function loadPdfLocal(fileName) {
+  const p = path.join(__dirname, fileName);
+  if (!fs.existsSync(p)) {
+    console.warn("No existe PDF:", p);
+    return "";
+  }
+  const data = await pdfParse(fs.readFileSync(p));
+  return (data.text || "").replace(/\u0000/g, "");
+}
+
+async function loadDocxLocal(fileName) {
+  const p = path.join(__dirname, fileName);
+  if (!fs.existsSync(p)) {
+    console.warn("No existe DOCX:", p);
+    return "";
+  }
+  // Lazy require para no crashear si no lo instalaste
+  const mammoth = require("mammoth");
+  const { value } = await mammoth.extractRawText({ path: p });
+  return (value || "").replace(/\s{2,}/g, " ").trim();
+}
+
+/** ============================================
+ *  CHUNKING
+ *  ============================================ */
 function chunkReglamento(text) {
   const parts = [];
-  const re = /(Artículo\s+\d+[^\n:.]*[:.]?)/ig;
-  let m, lastIdx = 0, currentTitle = "Sección";
+  const re = /(Articulo\s+\d+[^\n:.]*[:.]?)|(Artículo\s+\d+[^\n:.]*[:.]?)/ig;
+  let m, lastIdx = 0, currentTitle = "Seccion";
 
   while ((m = re.exec(text)) !== null) {
     const start = m.index;
@@ -61,15 +94,15 @@ function chunkReglamento(text) {
       const chunk = text.slice(lastIdx, start).trim();
       if (chunk) parts.push({ article: currentTitle, text: chunk, source: "Reglamento" });
     }
-    currentTitle = m[1].replace(/\s+/g, " ").trim();
-    lastIdx = start + m[0].length;
+    currentTitle = (m[1] || m[2] || "Articulo").replace(/\s+/g, " ").trim();
+    lastIdx = start + (m[1] ? m[1].length : m[2].length);
   }
   const tail = text.slice(lastIdx).trim();
   if (tail) parts.push({ article: currentTitle, text: tail, source: "Reglamento" });
 
   if (!parts.length) {
     for (let i = 0; i < text.length; i += 1200) {
-      parts.push({ article: "Sección", text: text.slice(i, i + 1200), source: "Reglamento" });
+      parts.push({ article: "Seccion", text: text.slice(i, i + 1200), source: "Reglamento" });
     }
   }
   return parts
@@ -82,8 +115,34 @@ function chunkReglamento(text) {
     .filter(p => p.text.length > 80);
 }
 
+function chunkGeneric(text, sourceLabel) {
+  const clean = text.replace(/\s{2,}/g, " ").trim();
+  if (!clean) return [];
+  const chunks = [];
+  const maxLen = 1600;
+  const paras = clean.split(/\n{2,}|\r{2,}/);
+  let buf = "";
+  for (const p of paras) {
+    if ((buf + " " + p).length > maxLen && buf) {
+      chunks.push(buf.trim());
+      buf = p;
+    } else {
+      buf += (buf ? " " : "") + p;
+    }
+  }
+  if (buf.trim()) chunks.push(buf.trim());
+  return chunks
+    .map((t, i) => ({
+      id: 5000 + i,
+      article: sourceLabel,
+      text: t.slice(0, 1800),
+      source: sourceLabel
+    }))
+    .filter(c => c.text.length > 80);
+}
+
 /** ============================================
- *  SCRAPER (solo si ENABLE_WEB_SOURCES = true)
+ *  (OPCIONAL) SCRAPER WEB
  *  ============================================ */
 async function fetchHTML(url) {
   const res = await fetch(url, { headers: { "user-agent": "Mozilla/5.0" } });
@@ -91,11 +150,10 @@ async function fetchHTML(url) {
   return res.text();
 }
 function extractQAsFromFAQ(html, label) {
-  // ⚠️ cargar cheerio SOLO aquí, bajo demanda
   const cheerio = require("cheerio");
   const $ = cheerio.load(html);
+  $("script, style, noscript, iframe, svg").remove();
   const blocks = [];
-
   const headings = $("h2, h3");
   headings.each((_, el) => {
     const title = $(el).text().trim();
@@ -104,25 +162,18 @@ function extractQAsFromFAQ(html, label) {
     let sib = $(el).next();
     while (sib.length && !/^h[23]$/i.test(sib[0].tagName)) {
       if (sib.is("p, li, ul, ol")) {
-        paras.push(sib.text().replace(/\s{2,}/g, " ").trim());
+        const t = sib.text().replace(/\s{2,}/g, " ").trim();
+        if (t) paras.push(t);
       }
       sib = sib.next();
     }
     const answer = paras.join(" ").trim();
-    if (answer) {
-      blocks.push({
-        article: `FAQ: ${title}`,
-        text: answer.slice(0, 1800),
-        source: label,
-      });
-    }
+    if (answer) blocks.push({ article: `FAQ: ${title}`, text: answer.slice(0, 1800), source: label });
   });
-
-  if (!blocks.length) {
-    const text = $("main, article, .entry-content, body").text().trim().replace(/\s{2,}/g, " ");
-    if (text.length > 120) blocks.push({ article: `${label}`, text: text.slice(0, 1800), source: label });
+  const bigText = $("main, article, .entry-content, body").text().replace(/\s{2,}/g, " ").trim();
+  if (!blocks.length && bigText.length > 160) {
+    blocks.push({ article: `${label}`, text: bigText.slice(0, 1800), source: label });
   }
-
   // dedup
   const seen = new Set();
   const unique = [];
@@ -134,6 +185,13 @@ function extractQAsFromFAQ(html, label) {
 }
 async function scrapeOfficialFAQs() {
   if (!ENABLE_WEB_SOURCES) return [];
+  const FAQ_SOURCES = [
+    { url: "https://ulead.ac.cr/faq/",             label: "FAQ general" },
+    { url: "https://ulead.ac.cr/bachilleratos/",   label: "Bachilleratos · FAQ" },
+    { url: "https://ulead.ac.cr/maestrias/",       label: "Maestrias · FAQ" },
+    { url: "https://ulead.ac.cr/especialidades/",  label: "Especialidades · FAQ" },
+    { url: "https://ulead.ac.cr/admision-y-becas/",label: "Admision y Becas" }
+  ];
   const out = [];
   for (const { url, label } of FAQ_SOURCES) {
     try {
@@ -164,16 +222,39 @@ function expandQueries(q) {
   const qs = new Set([q]);
   const lower = q.toLowerCase();
   if (/(aprue|aprob|nota|minim|escala|calific)/.test(lower)) {
-    qs.add(`${q} (nota mínima para aprobar, escala de calificaciones, letras A B C D F)`);
+    qs.add(`${q} (nota minima para aprobar, escala de calificaciones, letras A B C D F)`);
   }
-  if (/(aplazad|recuperaci|examen extraordinario| D\b)/.test(lower)) {
-    qs.add(`${q} (aplazado, prueba de recuperación, nota final C-)`);
+  if (/(aplazad|recuperaci|examen extraordinario| d\b)/.test(lower)) {
+    qs.add(`${q} (aplazado, prueba de recuperacion, nota final C-)`);
   }
-  if (/(crédito|carga|matrícul|retiro|beca|apelaci|duración|modalidad|horario|ubicación)/.test(lower)) {
-    qs.add(`${q} (artículos relevantes, requisitos, plazos, datos operativos oficiales)`);
+  if (/(credito|carga|matricul|retiro|beca|apelaci|duracion|modalidad|horario|ubicacion|practica)/.test(lower)) {
+    qs.add(`${q} (articulos relevantes, requisitos, plazos, datos operativos oficiales)`);
   }
   return Array.from(qs).slice(0, 4);
 }
+
+// Boost hacia fuentes específicas según el tema
+function sourceBoost(query, srcLabel = "") {
+  const q = (query || "").toLowerCase();
+  const s = (srcLabel || "").toLowerCase();
+
+  const isProgramInfo = /(duraci[oó]n|duracion|modalidad|modalidades|bachillerato|maestr[ií]a|maestria|especialidad)/i.test(q);
+  const isPPS        = /(pr[aá]ctica|practica|pps|solicitud|fecha\s*l[ií]mite|fecha\s*limite)/i.test(q);
+  const isCamera     = /(c[aá]mara|camara|video|zoom|encender\s*camara)/i.test(q);
+
+  if (isProgramInfo && /(faq|sitio|bachilleratos|maestrias|especialidades|admision)/i.test(s)) {
+    return 0.08;
+  }
+  if (isPPS && /(boletin|comunicado|pps|solicitud de practica|solicitud de pr[aá]ctica|practica profesional)/i.test(s)) {
+    return 0.12;
+  }
+  if (isCamera && /(camara|politica.*camara|dec-010|clases virtuales|hibridas)/i.test(s)) {
+    return 0.12; // prioriza políticas de cámara
+  }
+  return 0;
+}
+
+
 function mmrSelect(candidates, queryEmb, k = 6, lambda = 0.7) {
   const selected = [];
   const rest = candidates.map(c => ({ ...c }));
@@ -205,45 +286,84 @@ function loadIndexFromDisk() {
       ragIndex = JSON.parse(fs.readFileSync(INDEX_PATH, "utf8"));
       return true;
     } catch {
-      console.warn("No se pudo leer index.json; se reconstruirá.");
+      console.warn("No se pudo leer index.json; se reconstruira.");
     }
   }
   return false;
 }
+
 async function buildIndex() {
-  const text = await loadReglamento();
-  const reglChunks = chunkReglamento(text);
   const out = [];
+
   // 1) Reglamento
+  const reglText = await loadReglamento();
+  const reglChunks = chunkReglamento(reglText);
   for (const c of reglChunks) {
     const emb = await embedText(`${c.article}\n${c.text}`);
     out.push({ ...c, embedding: emb });
   }
-  // 2) Web oficial (si activado)
+
+  // 2) Docs adicionales: PDF/DOCX
+  for (const doc of EXTRA_DOCS) {
+    const ext = path.extname(doc.file).toLowerCase();
+    let raw = "";
+    if (ext === ".pdf") raw = await loadPdfLocal(doc.file);
+    else if (ext === ".docx") raw = await loadDocxLocal(doc.file);
+    else {
+      console.warn("Tipo de archivo no soportado:", doc.file);
+      continue;
+    }
+    if (!raw) continue;
+    const chunks = chunkGeneric(raw, doc.label);
+    for (const c of chunks) {
+      const emb = await embedText(`${c.article}\n${c.text}`);
+      out.push({ ...c, embedding: emb });
+    }
+  }
+
+  // 3) Boletines (OVERRIDES)
+  for (const b of BULLETINS) {
+    const emb = await embedText(`${b.title}\n${b.text}`);
+    out.push({
+      id: 990000 + out.length,
+      article: b.title,
+      text: b.text.slice(0, 1800),
+      source: `Boletin / ${b.source} (${b.date})`,
+      embedding: emb
+    });
+  }
+
+  // 4) (Opcional) sitio web
   const webChunks = await scrapeOfficialFAQs();
   for (const c of webChunks) {
     const emb = await embedText(`${c.article}\n${c.text}`);
     out.push({ ...c, embedding: emb });
   }
+
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
   fs.writeFileSync(INDEX_PATH, JSON.stringify(out));
   ragIndex = out;
-  console.log(`Índice listo: ${out.length} chunks${ENABLE_WEB_SOURCES ? " (Reglamento + Web)" : ""}`);
+  console.log(`Indice listo: ${out.length} chunks`);
 }
+
 async function ensureIndex() {
   if (ragIndex) return;
   if (loadIndexFromDisk()) return;
   await buildIndex();
 }
+
 async function searchRelevant(query, k = 6) {
   await ensureIndex();
   const qEmbMain = await embedText(query);
   const alts = expandQueries(query);
   const pool = new Map();
+
   for (const alt of alts) {
     const qEmb = alt === query ? qEmbMain : await embedText(alt);
     ragIndex.forEach(c => {
-      const score = cosine(qEmb, c.embedding);
+      const base = cosine(qEmb, c.embedding);
+      const boost = sourceBoost(query, c.source || c.article || "");
+      const score = base + boost;
       const prev = pool.get(c.id);
       if (!prev || score > prev.score) pool.set(c.id, { ...c, score });
     });
@@ -253,37 +373,52 @@ async function searchRelevant(query, k = 6) {
 }
 
 /** ============================================
- *  PROMPTS + PARSEO ROBUSTO DE JSON
+ *  PROMPT JSON + OVERRIDES
  *  ============================================ */
+function buildOverridesBlock() {
+  if (!BULLETINS || !BULLETINS.length) return "";
+  const lines = BULLETINS.map(b =>
+    `- ${b.title} (${b.date}): ${b.text}`
+  );
+  return `\nACTUALIZACIONES OFICIALES (PRIORITARIAS SI CONTRADICEN OTRAS FUENTES):\n${lines.join("\n")}\n`;
+}
+
 function buildJsonPrompt(contexts, pregunta) {
   const ctx = contexts.map((c, i) =>
     `#${i+1} [${c.source}] (${c.article})\n${c.text}`).join("\n\n");
 
+  const overrides = buildOverridesBlock();
+
   return `
 Eres un asistente de Lead University.
-Responde SOLO con base en los CONTEXTOS (Reglamento y/o sitio oficial). Si no está, dilo claro.
+Responde SOLO con base en los CONTEXTOS y en las ACTUALIZACIONES OFICIALES (si existen).
+Si la pregunta es informativa/operativa (p.ej., fechas, convocatorias, PPS), PRIORIZA las ACTUALIZACIONES OFICIALES.
+Si es normativa (evaluaciones, aplazados, apelaciones), PRIORIZA el REGLAMENTO.
+Si hay conflicto entre documentos, las ACTUALIZACIONES OFICIALES tienen prioridad.
 
 CONTEXTOS:
 ${ctx}
+${overrides}
 
 PREGUNTA:
 ${pregunta}
 
 DEVUELVE SOLO JSON (sin markdown ni texto adicional):
 {
-  "answer": "respuesta clara y breve (máx ~120 palabras). Cita artículos como 'Art. X' cuando aplica. Si es info operativa del sitio, acláralo.",
+  "answer": "respuesta clara y breve (max ~120 palabras). Cita 'Art. X' si aplica o 'Boletin' si viene del comunicado.",
   "examples": [
-    { "type": "table", "title": "Título", "columns": ["Col 1","Col 2"], "rows": [["v11","v12"],["v21","v22"]] },
+    { "type": "table", "title": "Titulo", "columns": ["Col 1","Col 2"], "rows": [["v11","v12"],["v21","v22"]] },
     { "type": "steps", "title": "Pasos para ...", "items": ["Paso 1","Paso 2","Paso 3"] }
   ],
   "refs": [ { "article": "Art. 12", "summary": "…" } ]
 }
 `;
 }
+
 function parseModelJSON(raw) {
   if (!raw || typeof raw !== "string") return null;
   let s = raw.replace(/^\uFEFF/, "").trim();
-  s = s.replace(/^```[a-z]*\s*/i, "").replace(/```$/i, "").trim(); // quita fences
+  s = s.replace(/^```[a-z]*\s*/i, "").replace(/```$/i, "").trim();
   if (s.startsWith("{") && s.endsWith("}")) {
     try { return JSON.parse(s); } catch {}
   }
@@ -336,7 +471,6 @@ exports.consultarReglamento = onRequest(async (req, res) => {
         timestamp: new Date().toISOString()
       });
     }
-    // Fallback si vino texto suelto
     return res.json({
       success: true,
       answer: raw,
@@ -376,7 +510,6 @@ exports.getBecasInfo = onRequest(async (req, res) => {
     const chunks = chunkReglamento(text).filter(c => /beca/i.test(c.text) || /beca/i.test(c.article));
     const seed   = chunks.length ? chunks : chunkReglamento(text).slice(0, 6);
     const prompt = buildJsonPrompt(seed, "Resumen visual de becas (tipos, requisitos, porcentajes, proceso)");
-
     const model  = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const result = await model.generateContent(prompt);
     const raw    = await result.response.text();

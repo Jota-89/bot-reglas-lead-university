@@ -10,8 +10,11 @@ COPY package.json ./
 COPY firebase.json ./
 COPY .env ./
 
-# Copiar el PDF del reglamento
-COPY functions/Reglamento.pdf ./functions/
+# Copiar TODOS los PDF y DOCX que haya en /functions
+COPY functions/*.pdf ./functions/
+COPY functions/*.docx ./functions/
+
+
 
 # Instalar dependencias principales
 RUN npm install
