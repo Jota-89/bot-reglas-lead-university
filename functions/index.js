@@ -11,7 +11,7 @@ admin.initializeApp();
 /** ============================================
  *  CONFIG
  *  ============================================ */
-const genAI = new GoogleGenerativeAI("AIzaSyCr4iFChsKJmvN92nNHq1xX97XFDy-cuxk");
+const genAI = new GoogleGenerativeAI("AIzaSyAm9Lv1pw24jNpdvj3VmKx021Bw6KDMzlE");
 
 // Activa scraping si quieres sumar el sitio. (true/false)
 const ENABLE_WEB_SOURCES = true;
@@ -20,7 +20,7 @@ const EXTRA_DOCS = [
   { file: "Practica_Profesional.pdf", label: "Practica Profesional Supervisada (PPS)" },
   { file: "DEC-010-A Política para las clases virtuales e hibridas.pdf", label: "Politica clases virtuales e hibridas (DEC-010) camara" },
   { file: "SolicituddePracticaProfesional2023.docx", label: "Solicitud de Practica Profesional (PPS)" },
-  { file: "Politicadeusodecamara.docx", label: "Politica de uso de camara" }   // <-- NUEVO
+  { file: "Politicadeusodecamara.docx", label: "Politica de uso de camara" }
 ];
 
 
@@ -31,8 +31,28 @@ const BULLETINS = [
     text: "Periodo abierto para recepcion de solicitudes de Practica Profesional Supervisada. Fecha limite: lunes 01 de septiembre de 2025. Solicitudes posteriores se evaluan caso por caso. La PPS es requisito de graduacion; conlleva la matricula de un curso con sesiones semanales durante el cuatrimestre y el desarrollo del TFG. La PPS no se puede convalidar. Si ya trabaja, debe solicitar igualmente para evaluar aplicabilidad de la posicion. Para PPS en tercer cuatrimestre, el/la estudiante debe estar laborando a mas tardar el lunes 01 de septiembre de 2025; si inicia despues, debe comunicarlo para valorar.",
     source: "Comunicado oficial (correo)",
     date: "2025-09-01"
+  },
+  {
+    title: "Normativa de camara obligatoria 2025",
+    text: `Estimados estudiantes:
+
+En respuesta a los retos y oportunidades que plantea la educación virtual e híbrida, la Universidad LEAD ha implementado una normativa específica para regular estas modalidades. Esta iniciativa busca garantizar un entorno académico que promueva la equidad, la interacción activa y el respeto mutuo, preservando la calidad educativa que nos caracteriza.
+
+¿Qué significa esto para ustedes?
+
+- Cámara encendida: Será obligatorio mantener la cámara encendida durante las sesiones virtuales e híbridas para fomentar la interacción activa y asegurar la participación efectiva.
+  - En casos justificados, deberán notificar al docente con antelación para coordinar una excepción.
+- Se protegerá la privacidad y la confidencialidad de los datos académicos y personales que se generen durante las sesiones.
+- Estas normas están diseñadas para garantizar una experiencia educativa justa y enriquecedora para todos.
+
+La normativa será de aplicación inmediata, y les instamos a cumplir con estas disposiciones, que buscan fortalecer nuestra experiencia educativa. Su compromiso será clave para el éxito de este modelo.
+
+Para consultas o aclaraciones, pueden comunicarse con sus docentes o con la Decanatura.`,
+    source: "Boletin / Decanatura",
+    date: "2025-01-13"
   }
 ];
+
 
 /** ============================================
  *  ESTADO / RUTAS
@@ -243,16 +263,17 @@ function sourceBoost(query, srcLabel = "") {
   const isCamera     = /(c[aá]mara|camara|video|zoom|encender\s*camara)/i.test(q);
 
   if (isProgramInfo && /(faq|sitio|bachilleratos|maestrias|especialidades|admision)/i.test(s)) {
-    return 0.08;
+    return 0.08; // sitio oficial para info de programas
   }
   if (isPPS && /(boletin|comunicado|pps|solicitud de practica|solicitud de pr[aá]ctica|practica profesional)/i.test(s)) {
-    return 0.12;
+    return 0.12; // prioriza boletines/pps
   }
-  if (isCamera && /(camara|politica.*camara|dec-010|clases virtuales|hibridas)/i.test(s)) {
-    return 0.12; // prioriza políticas de cámara
+  if (isCamera && /(boletin|comunicado|camara|politica.*camara|dec-010|clases virtuales|hibridas)/i.test(s)) {
+    return 0.20; // prioriza la normativa de cámara (boletín/políticas)
   }
   return 0;
 }
+
 
 
 function mmrSelect(candidates, queryEmb, k = 6, lambda = 0.7) {
